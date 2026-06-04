@@ -2,7 +2,7 @@
 
 [![Python Verification](https://github.com/LiTongShuo-edu/visual-tracking-gimbal/actions/workflows/python.yml/badge.svg)](https://github.com/LiTongShuo-edu/visual-tracking-gimbal/actions/workflows/python.yml)
 
-这是一个基于 Python / OpenCV 的双轴视觉追踪云台控制项目。系统从摄像头画面中识别靶标，计算目标相对画面中心的偏差和距离，并转换为 YAW 连续旋转舵机与 PITCH 角度舵机的控制指令。
+这是一个基于 Python / OpenCV 的双轴视觉追踪云台控制项目。系统运行在 Orange Pi 5 Pro 8G 上，从 720p USB 摄像头画面中识别靶标，计算目标相对画面中心的偏差和距离，并转换为两个 MG90S 舵机驱动的 3D 打印自制云台控制指令。
 
 项目整理重点是把实机调试记录工程化为可公开验证的代码：控制逻辑可单元测试，硬件输出可替换为模拟控制器，视觉、控制和终端命令之间的共享状态通过锁保护。
 
@@ -35,11 +35,21 @@ wiringpi 真实云台 / FakeGimbal 无硬件测试
 | `visual_tracking_gimbal/cli.py` | 终端命令解析和控制步进入口 |
 | `tests/` | 无硬件自动化测试，覆盖控制、线程状态、CLI、视觉辅助函数 |
 
+## 硬件环境
+
+| 硬件 | 配置 |
+| --- | --- |
+| 主控 | Orange Pi 5 Pro 8G |
+| 云台结构 | 3D 打印自制双轴云台 |
+| 舵机 | MG90S 舵机 x 2 |
+| 摄像头 | 720p USB 摄像头 |
+| 控制接口 | Linux GPIO/PWM，代码中通过 `wiringpi` 封装硬件输出 |
+
 ## 控制策略
 
-YAW 轴使用连续旋转舵机。为了避免小误差下长时间输出导致过冲，控制器将理想速度转换为软件 PWM：误差越大，占空比越高；目标进入中心死区时直接停止输出。
+YAW 轴使用 MG90S 舵机驱动云台水平转动。为了避免小误差下长时间输出导致过冲，控制器将理想速度转换为软件 PWM：误差越大，占空比越高；目标进入中心死区时直接停止输出。
 
-PITCH 轴使用角度型舵机。整理后的逻辑不再持续累加控制量，而是将画面 Y 方向误差按视场角比例映射到目标角度，再通过平滑系数逐步逼近。目标置信度不足或舵机未使能时，PITCH 保持当前角度，YAW 输出 0。
+PITCH 轴同样使用 MG90S 舵机驱动俯仰角。整理后的逻辑不再持续累加控制量，而是将画面 Y 方向误差按视场角比例映射到目标角度，再通过平滑系数逐步逼近。目标置信度不足或舵机未使能时，PITCH 保持当前角度，YAW 输出 0。
 
 ## 安装
 
@@ -88,7 +98,7 @@ python -m venv .venv
 | `status` | 打印当前共享状态 |
 | `q` / `quit` / `exit` | 安全退出 |
 
-真实硬件输出需要 Linux、V4L2 摄像头、双轴云台和 `wiringpi` 环境：
+真实硬件输出面向 Orange Pi 5 Pro 8G、720p USB 摄像头、MG90S 舵机 x 2、3D 打印自制云台和 `wiringpi` 环境：
 
 ```powershell
 .\.venv\Scripts\python.exe -m visual_tracking_gimbal --hardware --yaw-pin 21 --pitch-pin 22
