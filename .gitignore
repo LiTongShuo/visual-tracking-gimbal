@@ -1,0 +1,20 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+
+# Local hardware/runtime artifacts
+*.log
+*.json
+*.avi
+*.mp4
+*.png
+
+# Original Gemini browser export kept locally as source material, not as project code.
+视觉追踪云台调试与优化 - Google Gemini.html
+视觉追踪云台调试与优化 - Google Gemini_files/
