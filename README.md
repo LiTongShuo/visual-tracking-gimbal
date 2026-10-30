@@ -1,139 +1,96 @@
 # Visual Tracking Gimbal
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
 [![Python Verification](https://github.com/LiTongShuo-edu/visual-tracking-gimbal/actions/workflows/python.yml/badge.svg)](https://github.com/LiTongShuo-edu/visual-tracking-gimbal/actions/workflows/python.yml)
 
-这是一个基于 Python / OpenCV 的双轴视觉追踪云台控制项目。系统运行在 Orange Pi 5 Pro 8G 上，从 720p USB 摄像头画面中识别靶标，计算目标相对画面中心的偏差和距离，并转换为两个 MG90S 舵机驱动的 3D 打印自制云台控制指令。
+A Python / OpenCV two-axis visual tracking gimbal project. Running on an Orange Pi 5 Pro 8G, it identifies a target in 720p USB camera frames, estimates its distance and displacement from the image center, and converts these into commands for a 3D-printed gimbal driven by two MG90S servos.
 
-项目整理重点是把实机调试记录工程化为可公开验证的代码：控制逻辑可单元测试，硬件输出可替换为模拟控制器，视觉、控制和终端命令之间的共享状态通过锁保护。
+The project turns hardware debugging notes into publicly verifiable code: control logic is unit-testable, hardware output can be replaced by a mock controller, and shared state between vision, control, and terminal threads is protected by locks.
 
-## 工作流程
+## Workflow
 
 ```text
-摄像头画面
+Camera frame
     |
-OpenCV 灰度化、模糊、边缘检测、阈值分割
+OpenCV grayscale, blur, edge detection, thresholding
     |
-轮廓层级筛选与靶标中心定位
+Contour hierarchy filtering and target center detection
     |
-PnP 距离估计与误差计算
+PnP distance estimation and error calculation
     |
-线程安全共享状态
+Thread-safe shared state
     |
-YAW 软件 PWM + PITCH 视场角映射
+YAW software PWM + PITCH field-of-view mapping
     |
-wiringpi 真实云台 / FakeGimbal 无硬件测试
+wiringpi hardware / FakeGimbal hardware-free testing
 ```
 
-## 功能模块
+## Modules
 
-| 模块 | 作用 |
+| Module | Purpose |
 | --- | --- |
-| `visual_tracking_gimbal/vision.py` | OpenCV 目标检测、轮廓点排序、PnP 距离估计 |
-| `visual_tracking_gimbal/control.py` | YAW 软件 PWM、死区、限幅、PITCH 角度映射和平滑 |
-| `visual_tracking_gimbal/state.py` | 线程安全共享状态，供视觉、控制和终端命令线程读写 |
-| `visual_tracking_gimbal/hardware.py` | `wiringpi` 真实硬件控制与 `FakeGimbal` 模拟控制器 |
-| `visual_tracking_gimbal/cli.py` | 终端命令解析和控制步进入口 |
-| `tests/` | 无硬件自动化测试，覆盖控制、线程状态、CLI、视觉辅助函数 |
+| `visual_tracking_gimbal/vision.py` | OpenCV target detection, contour point ordering, PnP distance estimation |
+| `visual_tracking_gimbal/control.py` | YAW software PWM, dead zone, limits, PITCH angle mapping and smoothing |
+| `visual_tracking_gimbal/state.py` | Thread-safe state shared by vision, control, and terminal threads |
+| `visual_tracking_gimbal/hardware.py` | `wiringpi` hardware control and `FakeGimbal` mock |
+| `visual_tracking_gimbal/cli.py` | Terminal commands and control-step entry point |
+| `tests/` | Hardware-free tests for control, state, CLI, and vision helpers |
 
-## 硬件环境
+## Hardware
 
-| 硬件 | 配置 |
-| --- | --- |
-| 主控 | Orange Pi 5 Pro 8G |
-| 云台结构 | 3D 打印自制双轴云台 |
-| 舵机 | MG90S 舵机 x 2 |
-| 摄像头 | 720p USB 摄像头 |
-| 控制接口 | Linux GPIO/PWM，代码中通过 `wiringpi` 封装硬件输出 |
+Orange Pi 5 Pro 8G, a self-built 3D-printed two-axis gimbal, two MG90S servos, and a 720p USB camera. Hardware output uses Linux GPIO/PWM through `wiringpi`.
 
-## 控制策略
+## Control strategy
 
-YAW 轴使用 MG90S 舵机驱动云台水平转动。为了避免小误差下长时间输出导致过冲，控制器将理想速度转换为软件 PWM：误差越大，占空比越高；目标进入中心死区时直接停止输出。
+YAW drives horizontal rotation using software PWM: larger errors increase the duty cycle, while entering the center dead zone stops output to reduce overshoot. PITCH maps vertical image error to a target angle using the field of view, then approaches it with smoothing rather than continuously accumulating commands. When confidence is insufficient or the servos are disabled, PITCH holds its angle and YAW output is zero.
 
-PITCH 轴同样使用 MG90S 舵机驱动俯仰角。整理后的逻辑不再持续累加控制量，而是将画面 Y 方向误差按视场角比例映射到目标角度，再通过平滑系数逐步逼近。目标置信度不足或舵机未使能时，PITCH 保持当前角度，YAW 输出 0。
+## Installation and use
 
-## 安装
-
-推荐使用 Python 3.12 虚拟环境：
+Python 3.12 is recommended:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-测试依赖：
-
-```powershell
+# Test dependencies:
 .\.venv\Scripts\python.exe -m pip install -r requirements-test.txt
-```
 
-## 使用
-
-查看命令行参数：
-
-```powershell
+# Options, hardware-free demo, and interactive terminal:
 .\.venv\Scripts\python.exe -m visual_tracking_gimbal --help
-```
-
-运行一个无摄像头、无硬件的控制演示：
-
-```powershell
 .\.venv\Scripts\python.exe -m visual_tracking_gimbal --demo-steps 20
-```
-
-进入交互式终端调试：
-
-```powershell
 .\.venv\Scripts\python.exe -m visual_tracking_gimbal
 ```
 
-常用命令：
-
-| 命令 | 作用 |
+| Command | Purpose |
 | --- | --- |
-| `gui on` / `gui off` | 打开或关闭 GUI 状态标记 |
-| `servo on` / `servo off` | 开启或关闭舵机输出状态 |
-| `search` | 进入扫描模式 |
-| `y` | 接受当前目标并回到追踪模式 |
-| `n` | 拒绝当前目标并进入逃逸模式 |
-| `status` | 打印当前共享状态 |
-| `q` / `quit` / `exit` | 安全退出 |
+| `gui on` / `gui off` | Toggle GUI status |
+| `servo on` / `servo off` | Enable or disable servo output |
+| `search` | Enter scanning mode |
+| `y` | Accept target and return to tracking |
+| `n` | Reject target and enter escape mode |
+| `status` | Print shared state |
+| `q` / `quit` / `exit` | Exit safely |
 
-真实硬件输出面向 Orange Pi 5 Pro 8G、720p USB 摄像头、MG90S 舵机 x 2、3D 打印自制云台和 `wiringpi` 环境：
+For the hardware setup described above:
 
 ```powershell
 .\.venv\Scripts\python.exe -m visual_tracking_gimbal --hardware --yaw-pin 21 --pitch-pin 22
 ```
 
-首次连接真实云台前，应先确认接线、电压范围、舵机方向和机械限位。
+Before connecting the gimbal, check wiring, voltage range, servo direction, and mechanical limits.
 
-## 测试与验证
+## Tests and validation
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-自动化测试覆盖：
+Tests cover YAW dead zone, limits and PWM duty cycle; PITCH limits, mapping and smoothing; protection during low confidence, target loss or disabled servos; concurrent `SharedState` updates and snapshots; `FakeGimbal`; CLI parsing; and vision helpers, PnP distance estimation and synthetic target detection. GitHub Actions runs the same hardware-free tests after commits.
 
-- YAW 死区、限幅和软件 PWM 占空比。
-- PITCH 角度限幅、视场角映射和平滑。
-- 低置信度、目标丢失和舵机未使能时的冻结保护。
-- `SharedState` 并发更新和线程安全快照。
-- `FakeGimbal` 无硬件控制路径。
-- CLI 命令解析。
-- 视觉辅助函数、PnP 距离估计和合成图像靶标检测。
+## Documentation and scope
 
-GitHub Actions 会在提交后运行同一组无硬件测试。
+- [Debugging and optimization notes](docs/debug-notes.md)
+- [Resume project summary](docs/resume-summary.md)
+- [Sources and publication boundaries](docs/source-boundary.md)
 
-## 调试文档
-
-- [调试与优化记录](docs/debug-notes.md)
-- [简历项目条目参考](docs/resume-summary.md)
-- [来源与公开边界](docs/source-boundary.md)
-
-## 公开边界
-
-本项目用于证明 Python、OpenCV、设备控制、多线程状态管理、调试优化和自动化测试实践。仓库不声明 gRPC/Protobuf、Appium 或 UIAutomation2 经验；这些能力需要由其他项目或后续补充材料单独支撑。
-
-原始 Gemini HTML 导出文件和浏览器资源目录只作为本地整理素材保留，不作为公开项目核心内容提交。
+This project demonstrates Python, OpenCV, device control, multithreaded state management, debugging, optimization, and automated testing. It does not claim gRPC/Protobuf, Appium, or UIAutomation2 experience; those require separate evidence. Original Gemini HTML exports and browser assets are retained only as local source material and are not core public project content.
