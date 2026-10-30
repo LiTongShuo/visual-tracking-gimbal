@@ -1,5 +1,7 @@
 # Visual Tracking Gimbal
 
+中文 | [English](README.en.md)
+
 [![Python Verification](https://github.com/LiTongShuo-edu/visual-tracking-gimbal/actions/workflows/python.yml/badge.svg)](https://github.com/LiTongShuo-edu/visual-tracking-gimbal/actions/workflows/python.yml)
 
 这是一个基于 Python / OpenCV 的双轴视觉追踪云台控制项目。系统运行在 Orange Pi 5 Pro 8G 上，从 720p USB 摄像头画面中识别靶标，计算目标相对画面中心的偏差和距离，并转换为两个 MG90S 舵机驱动的 3D 打印自制云台控制指令。
